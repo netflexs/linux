@@ -4,7 +4,7 @@ on:
   # Automatic triggers
   push:
     branches:
-      - main  # Adjust this to your main branch
+      - main
   pull_request:
     branches:
       - main
@@ -47,7 +47,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
 
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
 
     steps:
       - name: Download build artifact
@@ -56,12 +56,13 @@ jobs:
           name: kernel-build
 
       - name: Create GitHub Release
+        id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ github.run_number }}
-          release_name: Kernel Build v${{ github.run_number }}
+          tag_name: ${{ github.ref_name }}  # Use the tag name from the push event
+          release_name: Kernel Build ${{ github.ref_name }}
           draft: false
           prerelease: false
 
@@ -74,3 +75,4 @@ jobs:
           asset_path: kernel-build.tar.gz
           asset_name: kernel-build.tar.gz
           asset_content_type: application/gzip
+          
