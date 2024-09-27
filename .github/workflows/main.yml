@@ -47,8 +47,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
 
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-
     steps:
       - name: Download build artifact
         uses: actions/download-artifact@v3
@@ -61,8 +59,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}  # Use the tag name from the push event
-          release_name: Kernel Build ${{ github.ref_name }}
+          tag_name: v${{ github.run_number }}  # Auto-generate tag using the run number
+          release_name: Kernel Build v${{ github.run_number }}
           draft: false
           prerelease: false
 
@@ -75,4 +73,3 @@ jobs:
           asset_path: kernel-build.tar.gz
           asset_name: kernel-build.tar.gz
           asset_content_type: application/gzip
-          
