@@ -35,6 +35,8 @@ jobs:
           
           # Configure the kernel (adjust to your defconfig as needed)
           make O=$KERNEL_BUILD_DIR defconfig
+          # Ensure configuration is saved to .config
+          make O=$KERNEL_BUILD_DIR olddefconfig
 
       - name: Build Kernel with ThinLTO
         run: |
