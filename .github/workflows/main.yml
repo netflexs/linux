@@ -1,4 +1,4 @@
-name: Build Linux Kernel
+name: Build Linux Kernel with ThinLTO
 
 on:
   # Automatic triggers
@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Build Kernel
+    name: Build Kernel with ThinLTO
     runs-on: ubuntu-latest
 
     steps:
@@ -24,23 +24,38 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev clang lld
 
-      - name: Build Kernel
+      - name: Configure Kernel Build
         run: |
-          make defconfig
-          make -j$(nproc)
+          export ARCH=x86_64
+          export KERNEL_BUILD_DIR=output
+          export KERNEL_VERSION="0.$(date +'%Y%m%d').$(date +'%H%M%S')"
+          echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
+          
+          # Configure the kernel (adjust to your defconfig as needed)
+          make O=$KERNEL_BUILD_DIR defconfig
+
+      - name: Build Kernel with ThinLTO
+        run: |
+          # Compile with ThinLTO flags
+          make -j$(nproc) O=$KERNEL_BUILD_DIR \
+            ARCH=x86_64 \
+            CC=clang \
+            LD=ld.lld \
+            CFLAGS="-flto=thin" \
+            KCFLAGS="-flto=thin"
 
       - name: Archive the build artifacts
         run: |
-          tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
-        continue-on-error: true
+          mkdir -p artifacts
+          tar -czvf artifacts/kernel-build-$KERNEL_VERSION.tar.gz $KERNEL_BUILD_DIR/arch/x86/boot/bzImage
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v3
         with:
           name: kernel-build
-          path: kernel-build.tar.gz
+          path: artifacts/kernel-build-$KERNEL_VERSION.tar.gz
 
   release:
     name: Release Kernel
@@ -59,10 +74,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ github.run_number }}  # Auto-generate tag using the run number
-          release_name: Kernel Build v${{ github.run_number }}
+          tag_name: "v${{ env.KERNEL_VERSION }}"  # Auto-generate tag using version
+          release_name: "Kernel Build v${{ env.KERNEL_VERSION }}"
           draft: false
-          prerelease: false
+          prerelease: true
+          body: |
+            **Build Information**
+            - **Version:** ${{ env.KERNEL_VERSION }}
+            - **Build Configuration:** ThinLTO
+            - **Build Date:** $(date +'%Y-%m-%d %H:%M:%S')
 
       - name: Upload Kernel to Release
         uses: actions/upload-release-asset@v1
@@ -70,6 +90,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: kernel-build.tar.gz
-          asset_name: kernel-build.tar.gz
+          asset_path: artifacts/kernel-build-${{ env.KERNEL_VERSION }}.tar.gz
+          asset_name: kernel-build-${{ env.KERNEL_VERSION }}.tar.gz
           asset_content_type: application/gzip
