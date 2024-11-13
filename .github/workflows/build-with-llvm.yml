@@ -21,7 +21,7 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev
+          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio
 
       - name: Build Kernel with LLVM
         run: |
@@ -38,10 +38,38 @@ jobs:
           make defconfig
           make -j$(nproc) CC=clang LD=ld.lld
 
-      - name: Archive the build artifacts
+      - name: Archive the Kernel Artifact
         run: |
           tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
-        continue-on-error: true
+
+      - name: Build Root Filesystem
+        run: |
+          # Prepare root filesystem structure
+          mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
+          
+          # Copy busybox or basic binaries (assuming busybox is already available)
+          # Install busybox if not available
+          sudo apt-get install -y busybox
+          cp /bin/busybox rootfs/bin/
+          chroot rootfs /bin/busybox --install -s
+          
+          # Create init file
+          cat << 'EOF' > rootfs/init
+          #!/bin/sh
+          mount -t proc none /proc
+          mount -t sysfs none /sys
+          echo "Welcome to your custom OS!"
+          /bin/sh
+          EOF
+          chmod +x rootfs/init
+
+          # Create initramfs image
+          cd rootfs
+          find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
+
+      - name: Archive the RootFS Artifact
+        run: |
+          tar -czvf rootfs-build.tar.gz initramfs.img
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v3
@@ -49,16 +77,27 @@ jobs:
           name: kernel-build
           path: kernel-build.tar.gz
 
+      - name: Upload RootFS Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: rootfs-build
+          path: rootfs-build.tar.gz
+
   release:
-    name: Release Kernel
+    name: Release Kernel & RootFS
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download build artifact
+      - name: Download Kernel Artifact
         uses: actions/download-artifact@v3
         with:
           name: kernel-build
+
+      - name: Download RootFS Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: rootfs-build
 
       - name: Create GitHub Release
         id: create_release
@@ -79,4 +118,14 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: kernel-build.tar.gz
           asset_name: kernel-build.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload RootFS to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: rootfs-build.tar.gz
+          asset_name: rootfs-build.tar.gz
           asset_content_type: application/gzip
