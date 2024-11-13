@@ -1,15 +1,12 @@
 name: Build Linux Kernel with ThinLTO
 
 on:
-  # Automatic triggers
   push:
     branches:
       - main
   pull_request:
     branches:
       - main
-
-  # Manual trigger
   workflow_dispatch:
 
 jobs:
@@ -33,10 +30,9 @@ jobs:
           export KERNEL_VERSION="0.$(date +'%Y%m%d').$(date +'%H%M%S')"
           echo "KERNEL_VERSION=$KERNEL_VERSION" >> $GITHUB_ENV
           
-          # Configure the kernel (adjust to your defconfig as needed)
+          # Ensure the kernel configuration is created
           make O=$KERNEL_BUILD_DIR defconfig
-          # Ensure configuration is saved to .config
-          make O=$KERNEL_BUILD_DIR olddefconfig
+          make O=$KERNEL_BUILD_DIR menuconfig  # This command ensures a complete .config is created
 
       - name: Build Kernel with ThinLTO
         run: |
@@ -76,7 +72,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: "v${{ env.KERNEL_VERSION }}"  # Auto-generate tag using version
+          tag_name: "v${{ env.KERNEL_VERSION }}"
           release_name: "Kernel Build v${{ env.KERNEL_VERSION }}"
           draft: false
           prerelease: true
