@@ -1,0 +1,82 @@
+name: LLVM Linux Kernel
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Kernel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev
+
+      - name: Build Kernel with LLVM
+        run: |
+          # Set LLVM environment variables
+          export CC=clang
+          export LD=ld.lld
+          export AR=llvm-ar
+          export NM=llvm-nm
+          export OBJCOPY=llvm-objcopy
+          export OBJDUMP=llvm-objdump
+          export STRIP=llvm-strip
+          
+          # Build with LLVM
+          make defconfig
+          make -j$(nproc) CC=clang LD=ld.lld
+
+      - name: Archive the build artifacts
+        run: |
+          tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
+        continue-on-error: true
+
+      - name: Upload Kernel Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernel-build
+          path: kernel-build.tar.gz
+
+  release:
+    name: Release Kernel
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: kernel-build
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: LLVM Build v${{ github.run_number }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Kernel to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: kernel-build.tar.gz
+          asset_name: kernel-build.tar.gz
+          asset_content_type: application/gzip
