@@ -47,11 +47,9 @@ jobs:
           # Prepare root filesystem structure
           mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
           
-          # Copy busybox or basic binaries (assuming busybox is already available)
-          # Install busybox if not available
-          sudo apt-get install -y busybox
+          # Install busybox-static for a self-contained binary
+          sudo apt-get install -y busybox-static
           cp /bin/busybox rootfs/bin/
-          chroot rootfs /bin/busybox --install -s
           
           # Create init file
           cat << 'EOF' > rootfs/init
@@ -62,7 +60,12 @@ jobs:
           /bin/sh
           EOF
           chmod +x rootfs/init
-
+          
+          # Create symlinks for busybox commands
+          for cmd in $(rootfs/bin/busybox --list); do
+              ln -s /bin/busybox rootfs/bin/$cmd
+          done
+          
           # Create initramfs image
           cd rootfs
           find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
