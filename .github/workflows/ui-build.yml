@@ -1,4 +1,4 @@
-name: UI LLVM Linux Kernel
+name: LLVM Linux Kernel
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio
-          sudo apt-get install -y xorg openbox lightdm
+          sudo apt-get install -y xorg openbox xinit  # Tambahan GUI packages
 
       - name: Build Kernel with LLVM
         run: |
@@ -55,6 +55,9 @@ jobs:
           cp /bin/busybox rootfs/bin/
           cp /bin/neofetch rootfs/bin/
           cp /bin/htop rootfs/bin/
+          cp /usr/bin/openbox rootfs/usr/bin/
+          cp /usr/bin/xinit rootfs/usr/bin/
+          cp -r /usr/share/X11/ rootfs/usr/share/
 
           # Create init script to launch GUI
           cat << 'EOF' > rootfs/init
@@ -64,7 +67,12 @@ jobs:
           clear
           echo "Welcome to FOS!"
           # Start X with Openbox
-          startx
+          if [ -x /usr/bin/xinit ]; then
+              startx || xinit /usr/bin/openbox
+          else
+              echo "Xinit not found, dropping to shell"
+              /bin/sh
+          fi
           EOF
           chmod +x rootfs/init
 
@@ -131,8 +139,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: UI.V.${{ github.run_number }}
-          release_name: UI LLVM Build v${{ github.run_number }}
+          tag_name: llVm${{ github.run_number }}
+          release_name: LLVM Build v${{ github.run_number }}
           draft: false
           prerelease: false
 
