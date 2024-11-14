@@ -1,4 +1,4 @@
-name: LLVM Linux Kernel
+name: UI LLVM Linux Kernel
 
 on:
   push:
@@ -139,8 +139,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: llVm${{ github.run_number }}
-          release_name: LLVM Build v${{ github.run_number }}
+          tag_name: UI.llVm${{ github.run_number }}
+          release_name: UI.LLVM Build v${{ github.run_number }}
           draft: false
           prerelease: false
 
