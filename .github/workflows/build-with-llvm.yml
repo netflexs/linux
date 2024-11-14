@@ -1,4 +1,4 @@
-name: LLVM FOS Kernel
+name: LLVM Linux Kernel
 
 on:
   push:
@@ -21,10 +21,10 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio genisoimage grub-pc-bin xorriso curl
-
+          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio
       - name: Build Kernel with LLVM
         run: |
+          # Set LLVM environment variables
           export CC=clang
           export LD=ld.lld
           export AR=llvm-ar
@@ -33,81 +33,66 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
           
+          # Build with LLVM and ensure networking support is enabled
           make defconfig
+          make menuconfig  # Ensure networking is enabled, e.g., Ethernet, wireless, etc.
           make -j$(nproc) CC=clang LD=ld.lld
-
       - name: Archive the Kernel Artifact
         run: |
           tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
-
       - name: Build Root Filesystem
         run: |
-          mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
-
-          sudo apt-get install -y busybox-static
+          # Prepare root filesystem structure
+          mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin},home}
+          
+          # Install busybox-static for a self-contained binary
+          sudo apt-get install -y busybox-static openssh-server neofetch
           cp /bin/busybox rootfs/bin/
           
-          # Install Neofetch dependencies
-          sudo apt-get install -y neofetch
-          # Copy Neofetch to rootfs
-          cp /usr/bin/neofetch rootfs/usr/bin/
-          
-          # Modify the init script to run neofetch on boot
+          # Create init file
           cat << 'EOF' > rootfs/init
           #!/bin/sh
           mount -t proc none /proc
           mount -t sysfs none /sys
+          mount -t devtmpfs none /dev
+          
+          # Start networking (if DHCP is available)
+          ifconfig eth0 up
+          udhcpc -i eth0
+
+          # Start SSH service
+          /usr/sbin/sshd
+
+          # Display OS info with Neofetch
+          /usr/bin/neofetch
+
           echo "Welcome to FOS!"
-          neofetch
           /bin/sh
           EOF
           chmod +x rootfs/init
           
+          # Modify /etc/os-release to set OS name to "FOS"
+          mkdir -p rootfs/etc
+          cat << 'EOF' > rootfs/etc/os-release
+          NAME="FOS"
+          VERSION="1.0"
+          ID=fos
+          VERSION_ID="1.0"
+          PRETTY_NAME="FOS 1.0"
+          ANSI_COLOR="0;34"
+          EOF
+
           # Create symlinks for busybox commands
           for cmd in $(rootfs/bin/busybox --list); do
               [ ! -e rootfs/bin/$cmd ] && ln -s /bin/busybox rootfs/bin/$cmd
           done
           
+          # Create initramfs image
           cd rootfs
           find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
-
       - name: Archive the RootFS Artifact
         run: |
           tar -czvf rootfs-build.tar.gz initramfs.img
-
-      - name: Create Bootable ISO
-        run: |
-          mkdir -p iso/boot/grub
-
-          # Copy kernel and initramfs
-          cp arch/x86/boot/bzImage iso/boot/
-          cp initramfs.img iso/boot/
-
-          # Install GRUB files if they are not installed already
-          sudo apt-get install -y grub-pc-bin
-
-          # Copy GRUB stage2_eltorito and other necessary files
-          cp /usr/lib/grub/i386-pc/stage2_eltorito iso/boot/grub/
-          cp /usr/lib/grub/i386-pc/*_stage2.iso iso/boot/grub/
-
-          # Create GRUB configuration file
-          cat << EOF > iso/boot/grub/grub.cfg
-          set default=0
-          set timeout=5
-
-          menuentry "FOS OS" {
-              linux /boot/bzImage
-              initrd /boot/initramfs.img
-          }
-          EOF
-
-          # Create the ISO image
-          genisoimage -U -r -J -V "FOS_OS" -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -o fos_os.iso iso
-
-      - name: Archive the ISO Artifact
-        run: |
-          tar -czvf fos-os-build.tar.gz fos_os.iso
-
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -120,14 +105,8 @@ jobs:
           name: rootfs-build
           path: rootfs-build.tar.gz
 
-      - name: Upload ISO Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: iso-build
-          path: fos-os-build.tar.gz
-
   release:
-    name: Release FOS Kernel, RootFS, and ISO
+    name: Release Kernel & RootFS
     needs: build
     runs-on: ubuntu-latest
 
@@ -142,19 +121,14 @@ jobs:
         with:
           name: rootfs-build
 
-      - name: Download ISO Artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: iso-build
-
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: fos${{ github.run_number }}
-          release_name: FOS Build v${{ github.run_number }}
+          tag_name: llVm${{ github.run_number }}
+          release_name: LLVM Build v${{ github.run_number }}
           draft: false
           prerelease: false
 
@@ -176,14 +150,4 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: rootfs-build.tar.gz
           asset_name: rootfs-build.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload ISO to Release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: fos-os-build.tar.gz
-          asset_name: fos-os-build.tar.gz
           asset_content_type: application/gzip
