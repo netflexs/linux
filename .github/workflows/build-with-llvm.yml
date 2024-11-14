@@ -16,11 +16,12 @@ jobs:
 
     steps:
       - name: Notify Start of Build
-        uses: appleboy/telegram-action@v0.2.0
+        uses: xinthink/action-telegram@v1.1
         with:
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          message: "Build Kernel job has started."
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Build Kernel job has started."
+          skipSuccess: false
 
       - name: Checkout code
         uses: actions/checkout@v2
@@ -83,11 +84,12 @@ jobs:
 
       - name: Notify Build Completion
         if: always()
-        uses: appleboy/telegram-action@v0.2.0
+        uses: xinthink/action-telegram@v1.1
         with:
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          message: "Build Kernel job completed with status ${{ job.status }}."
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Build Kernel job completed with status ${{ job.status }}."
+          skipSuccess: false
 
   release:
     name: Release Kernel & RootFS
@@ -96,11 +98,12 @@ jobs:
 
     steps:
       - name: Notify Start of Release
-        uses: appleboy/telegram-action@v0.2.0
+        uses: xinthink/action-telegram@v1.1
         with:
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          message: "Release job has started."
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Release job has started."
+          skipSuccess: false
 
       - name: Download Kernel Artifact
         uses: actions/download-artifact@v3
@@ -145,8 +148,9 @@ jobs:
 
       - name: Notify Release Completion
         if: always()
-        uses: appleboy/telegram-action@v0.2.0
+        uses: xinthink/action-telegram@v1.1
         with:
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          message: "Release job completed with status ${{ job.status }}."
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Release job completed with status ${{ job.status }}."
+          skipSuccess: false
