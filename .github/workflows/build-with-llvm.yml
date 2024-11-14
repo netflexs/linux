@@ -16,11 +16,11 @@ jobs:
 
     steps:
       - name: Notify Start of Build
-        uses: xinthink/action-telegram@v1.1
+        uses: appleboy/telegram-action@v0.2.0
         with:
-          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
-          jobStatus: "Build Kernel job has started."
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: "Build Kernel job has started."
 
       - name: Checkout code
         uses: actions/checkout@v2
@@ -29,6 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio
+
       - name: Build Kernel with LLVM
         run: |
           export CC=clang
@@ -40,9 +41,11 @@ jobs:
           export STRIP=llvm-strip
           make defconfig
           make -j$(nproc) CC=clang LD=ld.lld
+
       - name: Archive the Kernel Artifact
         run: |
           tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
+
       - name: Build Root Filesystem
         run: |
           mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
@@ -61,14 +64,17 @@ jobs:
           done
           cd rootfs
           find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
+
       - name: Archive the RootFS Artifact
         run: |
           tar -czvf rootfs-build.tar.gz initramfs.img
+
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v3
         with:
           name: kernel-build
           path: kernel-build.tar.gz
+
       - name: Upload RootFS Artifact
         uses: actions/upload-artifact@v3
         with:
@@ -77,11 +83,11 @@ jobs:
 
       - name: Notify Build Completion
         if: always()
-        uses: xinthink/action-telegram@v1.1
+        uses: appleboy/telegram-action@v0.2.0
         with:
-          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
-          jobStatus: "Build Kernel job completed with status ${{ job.status }}."
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: "Build Kernel job completed with status ${{ job.status }}."
 
   release:
     name: Release Kernel & RootFS
@@ -90,11 +96,11 @@ jobs:
 
     steps:
       - name: Notify Start of Release
-        uses: xinthink/action-telegram@v1.1
+        uses: appleboy/telegram-action@v0.2.0
         with:
-          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
-          jobStatus: "Release job has started."
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: "Release job has started."
 
       - name: Download Kernel Artifact
         uses: actions/download-artifact@v3
@@ -139,8 +145,8 @@ jobs:
 
       - name: Notify Release Completion
         if: always()
-        uses: xinthink/action-telegram@v1.1
+        uses: appleboy/telegram-action@v0.2.0
         with:
-          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
-          jobStatus: "Release job completed with status ${{ job.status }}."
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          message: "Release job completed with status ${{ job.status }}."
