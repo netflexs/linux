@@ -42,7 +42,7 @@ jobs:
         run: |
           tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
 
-            - name: Build Root Filesystem
+      - name: Build Root Filesystem
         run: |
           # Prepare root filesystem structure
           mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
@@ -69,7 +69,6 @@ jobs:
           # Create initramfs image
           cd rootfs
           find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
-
 
       - name: Archive the RootFS Artifact
         run: |
