@@ -50,13 +50,16 @@ jobs:
       - name: Build Root Filesystem
         run: |
           mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
-          sudo apt-get install -y busybox-static
+          sudo apt-get install -y busybox-static neofetch htop
           cp /bin/busybox rootfs/bin/
+          cp /bin/neofetch rootfs/bin/
+          cp /bin/htop rootfs/bin/
           cat << 'EOF' > rootfs/init
           #!/bin/sh
           mount -t proc none /proc
           mount -t sysfs none /sys
-          echo "Welcome to your custom OS!"
+          clear
+          echo "Welcome to FOS!"
           /bin/sh
           EOF
           chmod +x rootfs/init
