@@ -1,4 +1,4 @@
-[![Build Linux Kernel](https://github.com/netflexs/linux/actions/workflows/main.yml/badge.svg)](https://github.com/netflexs/linux/actions/workflows/main.yml)
+[![Build Linux Kernel](https://github.com/netflexs/linux/actions/workflows/build-with-llvm.yml/badge.svg)](https://github.com/netflexs/linux/actions/workflows/build-with-llvm.yml)
 Linux kernel
 ============
 
