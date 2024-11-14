@@ -21,7 +21,8 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio
+          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio inetutils-ping neofetch openssh-server
+
       - name: Build Kernel with LLVM
         run: |
           # Set LLVM environment variables
@@ -33,66 +34,69 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
           
-          # Build with LLVM and ensure networking support is enabled
+          # Build with LLVM
           make defconfig
-          make menuconfig  # Ensure networking is enabled, e.g., Ethernet, wireless, etc.
           make -j$(nproc) CC=clang LD=ld.lld
+
       - name: Archive the Kernel Artifact
         run: |
           tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
+
       - name: Build Root Filesystem
         run: |
           # Prepare root filesystem structure
           mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin},home}
-          
-          # Install busybox-static for a self-contained binary
-          sudo apt-get install -y busybox-static openssh-server neofetch
+
+          # Install busybox-static for a self-contained binary and necessary packages
+          sudo apt-get install -y busybox-static inetutils-ping neofetch openssh-server
           cp /bin/busybox rootfs/bin/
           
-          # Create init file
-          cat << 'EOF' > rootfs/init
-          #!/bin/sh
-          mount -t proc none /proc
-          mount -t sysfs none /sys
-          mount -t devtmpfs none /dev
-          
-          # Start networking (if DHCP is available)
-          ifconfig eth0 up
-          udhcpc -i eth0
-
-          # Start SSH service
-          /usr/sbin/sshd
-
-          # Display OS info with Neofetch
-          /usr/bin/neofetch
-
-          echo "Welcome to FOS!"
-          /bin/sh
-          EOF
-          chmod +x rootfs/init
-          
-          # Modify /etc/os-release to set OS name to "FOS"
-          mkdir -p rootfs/etc
+          # Change OS name to "FOS"
+          echo "FOS" > rootfs/etc/hostname
           cat << 'EOF' > rootfs/etc/os-release
           NAME="FOS"
           VERSION="1.0"
           ID=fos
+          ID_LIKE=linux
           VERSION_ID="1.0"
-          PRETTY_NAME="FOS 1.0"
-          ANSI_COLOR="0;34"
+          PRETTY_NAME="FOS OS"
+          HOME_URL="http://example.com/"
+          EOF
+
+          # Set up SSH server
+          mkdir -p rootfs/etc/ssh
+          cp /etc/ssh/sshd_config rootfs/etc/ssh/
+          mkdir -p rootfs/etc/init.d
+          cat << 'EOF' > rootfs/etc/init.d/ssh
+          #!/bin/sh
+          /usr/sbin/sshd
+          EOF
+          chmod +x rootfs/etc/init.d/ssh
+
+          # Install Neofetch and add it to init
+          cp /usr/bin/neofetch rootfs/usr/bin/
+          cat << 'EOF' >> rootfs/init
+          #!/bin/sh
+          mount -t proc none /proc
+          mount -t sysfs none /sys
+          echo "Welcome to FOS OS!"
+          /usr/bin/neofetch
+          /bin/sh
           EOF
 
           # Create symlinks for busybox commands
           for cmd in $(rootfs/bin/busybox --list); do
               [ ! -e rootfs/bin/$cmd ] && ln -s /bin/busybox rootfs/bin/$cmd
           done
-          
+
           # Create initramfs image
           cd rootfs
           find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
+
       - name: Archive the RootFS Artifact
         run: |
           tar -czvf rootfs-build.tar.gz initramfs.img
+
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v3
         with:
