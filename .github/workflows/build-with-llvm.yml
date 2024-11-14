@@ -15,6 +15,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Notify Start of Build
+        uses: xinthink/action-telegram@v1.1
+        with:
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Build Kernel job has started."
+
       - name: Checkout code
         uses: actions/checkout@v2
 
@@ -24,7 +31,6 @@ jobs:
           sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio
       - name: Build Kernel with LLVM
         run: |
-          # Set LLVM environment variables
           export CC=clang
           export LD=ld.lld
           export AR=llvm-ar
@@ -32,8 +38,6 @@ jobs:
           export OBJCOPY=llvm-objcopy
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
-          
-          # Build with LLVM
           make defconfig
           make -j$(nproc) CC=clang LD=ld.lld
       - name: Archive the Kernel Artifact
@@ -41,31 +45,20 @@ jobs:
           tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
       - name: Build Root Filesystem
         run: |
-          # Prepare root filesystem structure
           mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
-          
-          # Install busybox-static for a self-contained binary
-          sudo apt-get install -y busybox-static neofetch
+          sudo apt-get install -y busybox-static
           cp /bin/busybox rootfs/bin/
-          cp /bin/neofetch rootfs/bin/
-          
-          # Create init file
           cat << 'EOF' > rootfs/init
           #!/bin/sh
           mount -t proc none /proc
           mount -t sysfs none /sys
-          clear
-          echo "Welcome to FOS!"
+          echo "Welcome to your custom OS!"
           /bin/sh
           EOF
           chmod +x rootfs/init
-          
-          # Create symlinks for busybox commands
           for cmd in $(rootfs/bin/busybox --list); do
               [ ! -e rootfs/bin/$cmd ] && ln -s /bin/busybox rootfs/bin/$cmd
           done
-          
-          # Create initramfs image
           cd rootfs
           find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
       - name: Archive the RootFS Artifact
@@ -76,12 +69,19 @@ jobs:
         with:
           name: kernel-build
           path: kernel-build.tar.gz
-
       - name: Upload RootFS Artifact
         uses: actions/upload-artifact@v3
         with:
           name: rootfs-build
           path: rootfs-build.tar.gz
+
+      - name: Notify Build Completion
+        if: always()
+        uses: xinthink/action-telegram@v1.1
+        with:
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Build Kernel job completed with status ${{ job.status }}."
 
   release:
     name: Release Kernel & RootFS
@@ -89,6 +89,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Notify Start of Release
+        uses: xinthink/action-telegram@v1.1
+        with:
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Release job has started."
+
       - name: Download Kernel Artifact
         uses: actions/download-artifact@v3
         with:
@@ -129,10 +136,11 @@ jobs:
           asset_path: rootfs-build.tar.gz
           asset_name: rootfs-build.tar.gz
           asset_content_type: application/gzip
-      
-      - name: Telegram Action
+
+      - name: Notify Release Completion
+        if: always()
         uses: xinthink/action-telegram@v1.1
         with:
-          botToken: 7610782174:AAG6Qi8UexM4LDJujrlMYD73J8gl4IU6d6E
-          chatId: -4520599724
-          jobStatus: ${{ job.status }}
+          botToken: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chatId: ${{ secrets.TELEGRAM_CHAT_ID }}
+          jobStatus: "Release job completed with status ${{ job.status }}."
