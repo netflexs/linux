@@ -21,7 +21,7 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio genisoimage grub-pc-bin xorriso
+          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio genisoimage grub-pc-bin xorriso curl
 
       - name: Build Kernel with LLVM
         run: |
@@ -46,16 +46,25 @@ jobs:
           
           sudo apt-get install -y busybox-static
           cp /bin/busybox rootfs/bin/
-          
+
+          # Install Neofetch dependencies
+          sudo apt-get install -y neofetch
+
+          # Copy Neofetch to rootfs
+          cp /usr/bin/neofetch rootfs/usr/bin/
+
+          # Modify the init script to run neofetch on boot
           cat << 'EOF' > rootfs/init
           #!/bin/sh
           mount -t proc none /proc
           mount -t sysfs none /sys
           echo "Welcome to FOS!"
+          neofetch
           /bin/sh
           EOF
           chmod +x rootfs/init
           
+          # Create symlinks for busybox commands
           for cmd in $(rootfs/bin/busybox --list); do
               [ ! -e rootfs/bin/$cmd ] && ln -s /bin/busybox rootfs/bin/$cmd
           done
