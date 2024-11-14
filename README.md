@@ -1,6 +1,9 @@
 [![Build Linux Kernel](https://github.com/netflexs/linux/actions/workflows/build-with-llvm.yml/badge.svg)](https://github.com/netflexs/linux/actions/workflows/build-with-llvm.yml)
 Linux kernel
 ============
+![GitHub Release](https://img.shields.io/github/v/release/netflexs/linux) ![GitHub Tag](https://img.shields.io/github/v/tag/netflexs/linux) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/netflexs/linux/latest/total)
+
+
 
 There are several guides for kernel developers and users. These guides can
 be rendered in a number of formats, like HTML and PDF. Please read
