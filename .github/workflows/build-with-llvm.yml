@@ -1,4 +1,4 @@
-name: LLVM Linux Kernel
+name: LLVM FOS Kernel
 
 on:
   push:
@@ -21,11 +21,10 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio
+          sudo apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio genisoimage grub-pc-bin xorriso
 
       - name: Build Kernel with LLVM
         run: |
-          # Set LLVM environment variables
           export CC=clang
           export LD=ld.lld
           export AR=llvm-ar
@@ -34,7 +33,6 @@ jobs:
           export OBJDUMP=llvm-objdump
           export STRIP=llvm-strip
           
-          # Build with LLVM
           make defconfig
           make -j$(nproc) CC=clang LD=ld.lld
 
@@ -44,35 +42,52 @@ jobs:
 
       - name: Build Root Filesystem
         run: |
-          # Prepare root filesystem structure
           mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin}}
           
-          # Install busybox-static for a self-contained binary
           sudo apt-get install -y busybox-static
           cp /bin/busybox rootfs/bin/
           
-          # Create init file
           cat << 'EOF' > rootfs/init
           #!/bin/sh
           mount -t proc none /proc
           mount -t sysfs none /sys
-          echo "Welcome to your custom OS!"
+          echo "Welcome to FOS!"
           /bin/sh
           EOF
           chmod +x rootfs/init
           
-          # Create symlinks for busybox commands
           for cmd in $(rootfs/bin/busybox --list); do
               [ ! -e rootfs/bin/$cmd ] && ln -s /bin/busybox rootfs/bin/$cmd
           done
           
-          # Create initramfs image
           cd rootfs
           find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img
 
       - name: Archive the RootFS Artifact
         run: |
           tar -czvf rootfs-build.tar.gz initramfs.img
+
+      - name: Create Bootable ISO
+        run: |
+          mkdir -p iso/boot/grub
+          cp arch/x86/boot/bzImage iso/boot/
+          cp rootfs/initramfs.img iso/boot/
+
+          cat << EOF > iso/boot/grub/grub.cfg
+          set default=0
+          set timeout=5
+          
+          menuentry "FOS OS" {
+              linux /boot/bzImage
+              initrd /boot/initramfs.img
+          }
+          EOF
+
+          genisoimage -U -r -J -V "FOS_OS" -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -o fos_os.iso iso
+
+      - name: Archive the ISO Artifact
+        run: |
+          tar -czvf fos-os-build.tar.gz fos_os.iso
 
       - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v3
@@ -86,8 +101,14 @@ jobs:
           name: rootfs-build
           path: rootfs-build.tar.gz
 
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: iso-build
+          path: fos-os-build.tar.gz
+
   release:
-    name: Release Kernel & RootFS
+    name: Release FOS Kernel, RootFS, and ISO
     needs: build
     runs-on: ubuntu-latest
 
@@ -102,14 +123,19 @@ jobs:
         with:
           name: rootfs-build
 
+      - name: Download ISO Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: iso-build
+
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: llVm${{ github.run_number }}
-          release_name: LLVM Build v${{ github.run_number }}
+          tag_name: fos${{ github.run_number }}
+          release_name: FOS Build v${{ github.run_number }}
           draft: false
           prerelease: false
 
@@ -131,4 +157,14 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: rootfs-build.tar.gz
           asset_name: rootfs-build.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload ISO to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: fos-os-build.tar.gz
+          asset_name: fos-os-build.tar.gz
           asset_content_type: application/gzip
