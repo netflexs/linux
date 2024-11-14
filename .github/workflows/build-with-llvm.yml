@@ -46,13 +46,10 @@ jobs:
           
           sudo apt-get install -y busybox-static
           cp /bin/busybox rootfs/bin/
-
           # Install Neofetch dependencies
           sudo apt-get install -y neofetch
-
           # Copy Neofetch to rootfs
           cp /usr/bin/neofetch rootfs/usr/bin/
-
           # Modify the init script to run neofetch on boot
           cat << 'EOF' > rootfs/init
           #!/bin/sh
@@ -80,8 +77,7 @@ jobs:
         run: |
           mkdir -p iso/boot/grub
           cp arch/x86/boot/bzImage iso/boot/
-          cp rootfs/initramfs.img iso/boot/
-
+          cp initramfs.img iso/boot/
           cat << EOF > iso/boot/grub/grub.cfg
           set default=0
           set timeout=5
@@ -91,7 +87,6 @@ jobs:
               initrd /boot/initramfs.img
           }
           EOF
-
           genisoimage -U -r -J -V "FOS_OS" -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -o fos_os.iso iso
 
       - name: Archive the ISO Artifact
