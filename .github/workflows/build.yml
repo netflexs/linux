@@ -1,5 +1,4 @@
-
-name: Build Linux Kernel
+name: Build Linux Kernel with TCC
 
 on:
   # Automatic triggers
@@ -15,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Build Kernel
+    name: Build Kernel with TCC
     runs-on: ubuntu-latest
 
     steps:
@@ -25,11 +24,21 @@ jobs:
       - name: Set up dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev
-      - name: Build Kernel
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev tcc
+
+      - name: Configure Kernel
         run: |
           make defconfig
-          make -j$(nproc)
+
+      - name: Build Kernel with TCC
+        run: |
+          # Set TCC as the compiler
+          export CC=tcc
+          export CFLAGS="-O2"  # Enable optimization (you can adjust the level for tuning performance)
+          
+          # Compile kernel with TCC
+          make -j$(nproc)  # Compile using all available CPU cores
+
       - name: Archive the build artifacts
         run: |
           tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
