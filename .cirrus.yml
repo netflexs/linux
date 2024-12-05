@@ -1,0 +1,61 @@
+task:
+  name: Build LLVM Linux Kernel
+  container:
+    image: ubuntu:latest
+  env:
+    CC: clang
+    LD: ld.lld
+    AR: llvm-ar
+    NM: llvm-nm
+    OBJCOPY: llvm-objcopy
+    OBJDUMP: llvm-objdump
+    STRIP: llvm-strip
+  install_script:
+    - apt-get update
+    - apt-get install -y clang llvm lld build-essential libncurses-dev bison flex libssl-dev libelf-dev cpio inetutils-ping neofetch openssh-server busybox-static
+  build_script:
+    - make defconfig
+    - make -j$(nproc) CC=$CC LD=$LD
+    - tar -czvf kernel-build.tar.gz arch/x86/boot/bzImage
+  rootfs_script:
+    - mkdir -p rootfs/{bin,sbin,etc,proc,sys,usr/{bin,sbin},home}
+    - cp /bin/busybox rootfs/bin/
+    - echo "FOS" > rootfs/etc/hostname
+    - |
+      cat << 'EOF' > rootfs/etc/os-release
+      NAME="FOS"
+      VERSION="1.0"
+      ID=fos
+      ID_LIKE=linux
+      VERSION_ID="1.0"
+      PRETTY_NAME="FOS OS"
+      HOME_URL="http://example.com/"
+      EOF
+    - mkdir -p rootfs/etc/ssh
+    - cp /etc/ssh/sshd_config rootfs/etc/ssh/
+    - mkdir -p rootfs/etc/init.d
+    - |
+      cat << 'EOF' > rootfs/etc/init.d/ssh
+      #!/bin/sh
+      /usr/sbin/sshd
+      EOF
+    - chmod +x rootfs/etc/init.d/ssh
+    - cp /usr/bin/neofetch rootfs/usr/bin/
+    - |
+      cat << 'EOF' > rootfs/init
+      #!/bin/sh
+      mount -t proc none /proc
+      mount -t sysfs none /sys
+      echo "Welcome to FOS OS!"
+      /usr/bin/neofetch
+      /bin/sh
+      EOF
+    - chmod +x rootfs/init
+    - for cmd in $(rootfs/bin/busybox --list); do
+        [ ! -e rootfs/bin/$cmd ] && ln -s /bin/busybox rootfs/bin/$cmd;
+      done
+    - (cd rootfs && find . | cpio -H newc -ov --owner root:root | gzip > ../initramfs.img)
+    - tar -czvf rootfs-build.tar.gz initramfs.img
+  artifacts:
+    kernel_build: kernel-build.tar.gz
+    rootfs_build: rootfs-build.tar.gz
