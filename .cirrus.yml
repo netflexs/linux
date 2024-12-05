@@ -1,5 +1,5 @@
 task:
-  name: Build LLVM Linux Kernel
+  name: Build Linux Kernel With LLVM
   container:
     image: ubuntu:latest
   env:
